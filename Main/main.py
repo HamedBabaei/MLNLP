@@ -96,7 +96,6 @@ class Pan:
             dv.hist( data = args['data'] , labels = args['labels'])
 
 
-
     #machine learning & natural language processing
     def Tf_idf(self):
         pass
@@ -130,16 +129,12 @@ class Pan:
         pass
     
 class Cross_Domain_Authorship_Attribution(Pan):
-    merge_candidates = False
-    all_candidates_txts = {}
-    dataset_root_dir = ""
-    #dataset path must be provided
 
     def Read_json_file(self, json_file_name):
         with codecs.open(json_file_name, 'r', encoding= 'utf-8') as json_read:
             self.json_context = json.load(json_read)
         return self.json_context
-    
+
     def Normal_context(self, **args):
         self.truth_problem = {}
         if args['whole_documents'] == 'on':
@@ -172,36 +167,54 @@ class Cross_Domain_Authorship_Attribution(Pan):
                 f.write('\n')
         f.close()
 
-
-    def Set_dataset_dir(self , path):
-        self.dataset_root_dir = path
-
-
-    def Read_collection_info(self):
-        with codecs.open(os.path.join(self.dataset_root_dir , "collection-info.json") , 'r' , encoding="utf-8") as f:
+    def Read_json(self , path):
+        ''' Read and return JSON file context from provided Path to the Json file!'''
+        with codecs.open( path , 'r' , encoding="utf-8") as f:
                 return json.load(f)
-    
-    def Read_problems(self):
-        problems = self.Read_collection_info()  
+
+    def Read_text(self , path):
+        ''' Read and return Text file context from provided Path to the Text file!'''
+        with codecs.open( path , 'r' , encoding='utf-8') as f:
+            return f.read()
+
+    def Read_problems(self , dataset_root_dir , merge_candidates = False):
+        """
+        Reading problems candidates texts from txt files.
+        Returning candidates text for each Problem in this Data Structors:
+        Here merge_candidates variabel is 'False'
+        all_candidates_txts = {
+            'problem00001': { 'candidate00001': [txt1 , txt2 , txt3 , txt4, ...],
+                             'candidate00002': [txt1 , txt2 , txt3 , txt4, ...],
+                             .....
+                             }
+            'problem00002': { 'candidate00001': [txt1 , txt2 , txt3 , txt4, ...],
+                             .....
+                             }
+            .....
+            ..... }
+        if merge_candidates variable is 'True'
+        all_candidates_txts = { 'problem00001': { 'candidate00001': txt , 'candidate00002': txt, ...} 
+                                'problem00002': { 'candidate00001': txt , .... } , .... }
+        """
+        all_candidates_txts = {}
+        problems = self.Read_json(os.path.join( dataset_root_dir , "collection-info.json"))
         for problem in problems:
             print("working on problem : " , problem['problem-name'])
-            with codecs.open(os.path.join(self.dataset_root_dir , problem['problem-name'], 'problem-info.json') ,'r' , encoding='utf-8') as j:
-                problem_info = json.load(j)
+            problem_info = self.Read_json(os.path.join( dataset_root_dir , problem['problem-name'], 'problem-info.json'))
             candidates = [candidate['author-name'] for candidate in problem_info['candidate-authors']]
             candidates_txts = {}
             for candidate in candidates:
                 txt = []
-                for txt_name in os.listdir(os.path.join(self.dataset_root_dir , problem['problem-name'] , candidate)):
-                    txt_path = os.path.join(os.path.join(self.dataset_root_dir , problem['problem-name'] , candidate , txt_name))
-                    with codecs.open(txt_path , 'r' , encoding='utf-8') as f:
-                        txt.append(f.read())
-                if self.merge_candidates:
+                for txt_name in os.listdir(os.path.join( dataset_root_dir , problem['problem-name'] , candidate)):
+                    txt_path = os.path.join(os.path.join( dataset_root_dir , problem['problem-name'] , candidate , txt_name))
+                    txt.append(self.Read_text(txt_path))
+                if merge_candidates:
                     candidates_txts[candidate] = ' '.join(txt)
                 else:
                     candidates_txts[candidate] = txt
-                    #yield candidates_txts
-            self.all_candidates_txts[problem['problem-name']] = candidates_txts
-    
+            all_candidates_txts[problem['problem-name']] = candidates_txts
+        return all_candidates_txts
+
 class Style_Change_Detection(Pan):
     pass
 
@@ -224,4 +237,4 @@ def main():
     print('Recall is : ', cross_domain_task.Recall())
     print('F1 score is : ', cross_domain_task.F1())
 
-if __name__ == "__main__": main()
+#if __name__ == "__main__": main()
