@@ -5,7 +5,7 @@ from nltk.tag import pos_tag
 import json
 import codecs
 import os
-import data_visualization as dv
+#import data_visualization as dv
 
 class Pan:
     english_stopwords = set(nltk.corpus.stopwords.words('english'))
@@ -96,6 +96,7 @@ class Pan:
             dv.hist( data = args['data'] , labels = args['labels'])
 
 
+
     #machine learning & natural language processing
     def Tf_idf(self):
         pass
@@ -105,32 +106,30 @@ class Pan:
 
     #interpret NLP
     def Stop_words(self):
-        #print(self.english_stopwords)
         return self.english_stopwords
 
-    def Precision(self):
-        # TP, TN, FP, FN = self.Tp_tn_fp_fn(self)
-        self.precision = self.TP / self.TP + self.FP
 
+
+    #performance
+    def Precision(self):     
+        self.precision = self.TP / (self.TP + self.FP)
         return self.precision
-    
+
+
     def Recall(self):
-        # TP, TN, FP, FN = self.Tp_tn_fp_fn(self)
-        # self.recall = TP / TP + FN
-        self.recall = self.TP / self.TP + self.FN
-
+        self.recall = self.TP / (self.TP + self.FN)
         return self.recall
-    
-    def F1(self):
-        # TP, TN, FP, FN = self.Tp_tn_fp_fn(self)
-        f1_score = 2 * (self.recall * self.precision) / (self.recall + self.precision)
 
+
+    def F1(self):
+        f1_score = 2 * (self.recall * self.precision) / (self.recall + self.precision)
         return f1_score
-    
+
+
     def Accuracy(self):
-        # TP, TN, FP, FN = self.Tp_tn_fp_fn(self)
-        # self.accuracy = TP + TN / TP + FP + FN + TN
-        self.accuracy = self.TP + self.TN / self.TP + self.FP + self.FN + self.TN
+        self.accuracy = (self.TP + self.TN) / (self.TP + self.FP + self.FN + self.TN)
+        return self.accuracy
+
 
     def C_at_1(self):
         pass
@@ -146,22 +145,20 @@ class Cross_Domain_Authorship_Attribution(Pan):
             self.json_context = json.load(json_read)
         return self.json_context
     
-    #arg[0] for determining two or more unknown  and args[1] 
+ 
     def Normal_context(self, **args):
         self.truth_problem = {}
         if args['whole_documents'] == 'on':
              for key, values in self.json_context.items():
                  self.truth_problem[key] = values['truth']
-                 #just change the return code and make it with one line code
-             return self.truth_problem
+        elif args['whole_documents'] == 'off' and 'target_problem' not in args.keys():
+            raise TypeError('Expected the value of the target_problem assigned to some value')
+    
         elif args['whole_documents'] == 'off':  
             self.truth_problem[args['target_problem']] = self.json_context[args['target_problem']]['truth']
-            return self.truth_problem
-        else:
-            # raise
-            pass
     
-        #performance
+        return self.truth_problem
+        
     def Confusion_matrix(self, prediction):
         self.TP, self.TN, self.FP, self.FN = 0, 0, 0, 0
         f = open('confusion.txt','w')
@@ -179,9 +176,7 @@ class Cross_Domain_Authorship_Attribution(Pan):
                     f.write('{} {} {} {}'.format(self.TP, self.TN, self.FP, self.FN))
                     f.write("\n")
                 f.write('\n')
-                # print(self.TP, self.TN, self.FP, self.FN)
         f.close()
-        #print(self.TP, self.TN, self.FP, self.FN)
 
 
     def Set_dataset_dir(self , path):
@@ -225,10 +220,14 @@ class Bots_And_Gender_Profiling(Pan):
 
 def main():
     cross_domain_task = Cross_Domain_Authorship_Attribution()
-    prediction_dic = cross_domain_task.Read_json_file("all_truth.json")
+    prediction_dic = cross_domain_task.Read_json_file("alternative_truth_json.json")
     prediction_normal = cross_domain_task.Normal_context(whole_documents = "on")
     cross_domain_task.Read_json_file("all_truth.json")
     cross_domain_task.Normal_context(whole_documents = "on")
     cross_domain_task.Confusion_matrix(prediction_normal)
+    print('Accuracy is : ',cross_domain_task.Accuracy())
+    print('Precision is : ', cross_domain_task.Precision())
+    print('Recall is : ', cross_domain_task.Recall())
+    print('F1 score is : ', cross_domain_task.F1())
 
 if __name__ == "__main__": main()
