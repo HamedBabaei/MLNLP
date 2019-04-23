@@ -5,7 +5,7 @@ from nltk.tag import pos_tag
 import json
 import codecs
 import os
-#import data_visualization as dv
+import data_visualization as dv
 
 class Pan:
     english_stopwords = set(nltk.corpus.stopwords.words('english'))
@@ -44,13 +44,57 @@ class Pan:
 
     #visualization
     def Pie(self, **args):
-        pass
+        """
+        Args here:
+        args = { 'x' : ['Cookies', 'Jellybean', 'Milkshake', 'Cheesecake'],
+                 'y' : [38.4, 40.6, 20.7, 10.3] , 
+                 'colors' : ['yellowgreen', 'gold', 'lightskyblue', 'lightcoral']}
+        """
+        if ('x' and 'y' and 'colors' not in args.keys()) and (type(args['x']) and type(args['y']) and type(args['colors']) is not list):
+            raise TypeError("Excpected 'x' , 'y' and 'colors' list arguments doesn't provided !")
+        else:
+            dv.pieplot(x = args['x'] , y = args['y'] , colors = args['colors'])
+        
     def Bar(self, **args):
-        pass
+        """
+        Args here:
+        args = { 'x': ('a' , 'b' , 'c', 'd' , 'f') , 
+                 'y' = [1, 2, 3 , 4 , 5] 
+                }
+        """
+        if ('x' and 'y' not in args.keys()) and type(args['x']) is not tuple and type(args['y']) is not list:
+            raise TypeError("Excpected 'x' (touple) and 'y' (list) arguments doesn't provided !")
+        else:
+            dv.bar(x = args['x'] , y = args['y'] )#,  xlabel = args['xlabel'] if 'xlabel' in args.keys() , 
+                   #ylabel=args['ylabel'] if 'ylabel' in args.keys() , title= args['title'] if 'title' in args.keys())
+        
     def Scatter(self, **args):
-        pass
+        """
+        Args here:
+        args = { 'x': [1 ,3 ,3 ,4 ,5 ... ] ,
+                 'y': [1 ,3 ,3 ,4 ,5 ... ] ,
+                 'colors': [3 , 3, 4, 5 ... ]
+                }
+        """
+        if ('x' and 'y' and 'colors' not in args.keys()) and (type(args['x']) and type(args['y']) and type(args['colors']) is not list):
+            raise TypeError("Excpected 'x' , 'y' and 'colors' list arguments doesn't provided !")
+        else:
+            dv.scatter( x = args['x'] , y = args['y'] , colors = args['colors'])
+
     def Hist(self, **args):
-        pass
+        """
+        Args Here:
+        args = { 
+                'data' : ( a , b , c ....) ,
+                'labels' : { 'a' ,'b', 'c' , ... }
+                }
+        here a, b , c and .. in 'data' key values are Lists
+        """
+        if ('data' and 'labels' not in args.keys()) and type(args['data']) is not tuple and type(args['colors']) is not dict:
+            raise TypeError("Excpected 'data' (touple of lists) and 'labels' (dict) arguments doesn't provided !")
+        else:
+            dv.hist( data = args['data'] , labels = args['labels'])
+
 
     #machine learning & natural language processing
     def Tf_idf(self):
