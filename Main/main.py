@@ -5,7 +5,7 @@ from nltk.tag import pos_tag
 import json
 import codecs
 import os
-#import data_visualization as dv
+import data_visualization as dv
 
 class Pan:
     english_stopwords = set(nltk.corpus.stopwords.words('english'))
@@ -43,7 +43,7 @@ class Pan:
         pass
 
     #visualization
-    def Pie(self, **args):
+    def Pie(self, args ,**argss):
         """
         Args here:
         args = { 'x' : ['Cookies', 'Jellybean', 'Milkshake', 'Cheesecake'],
@@ -55,7 +55,7 @@ class Pan:
         else:
             dv.pieplot(x = args['x'] , y = args['y'] , colors = args['colors'])
         
-    def Bar(self, **args):
+    def Bar(self, args ,**argss):
         """
         Args here:
         args = { 'x': ('a' , 'b' , 'c', 'd' , 'f') , 
@@ -68,7 +68,7 @@ class Pan:
             dv.bar(x = args['x'] , y = args['y'] )#,  xlabel = args['xlabel'] if 'xlabel' in args.keys() , 
                    #ylabel=args['ylabel'] if 'ylabel' in args.keys() , title= args['title'] if 'title' in args.keys())
         
-    def Scatter(self, **args):
+    def Scatter(self, args, **argss):
         """
         Args here:
         args = { 'x': [1 ,3 ,3 ,4 ,5 ... ] ,
@@ -81,7 +81,7 @@ class Pan:
         else:
             dv.scatter( x = args['x'] , y = args['y'] , colors = args['colors'])
 
-    def Hist(self, **args):
+    def Hist(self, args, **argss):
         """
         Args Here:
         args = { 
@@ -108,23 +108,18 @@ class Pan:
     def Stop_words(self):
         return self.english_stopwords
 
-
-
     #performance
     def Precision(self):     
         self.precision = self.TP / (self.TP + self.FP)
         return self.precision
 
-
     def Recall(self):
         self.recall = self.TP / (self.TP + self.FN)
         return self.recall
 
-
     def F1(self):
         f1_score = 2 * (self.recall * self.precision) / (self.recall + self.precision)
         return f1_score
-
 
     def Accuracy(self):
         self.accuracy = (self.TP + self.TN) / (self.TP + self.FP + self.FN + self.TN)
@@ -145,7 +140,6 @@ class Cross_Domain_Authorship_Attribution(Pan):
             self.json_context = json.load(json_read)
         return self.json_context
     
- 
     def Normal_context(self, **args):
         self.truth_problem = {}
         if args['whole_documents'] == 'on':
