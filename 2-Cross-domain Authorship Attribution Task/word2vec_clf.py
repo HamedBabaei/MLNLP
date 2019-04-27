@@ -1,135 +1,35 @@
 import os
-import nltk
 import json
 import codecs
-import gensim
-from nltk.tokenize import word_tokenize
 import operator
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.svm import LinearSVC , SVC
 import re
-from nltk.stem import WordNetLemmatizer
 import string
+import nltk
+from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
-from gensim.models.word2vec import Word2Vec
+from nltk.stem import WordNetLemmatizer
 import numpy as np
 from sklearn.preprocessing import scale
-from sklearn.metrics import f1_score
+from tqdm import tqdm
+from sklearn import utils
+#MODELS
+import gensim
+from gensim.models.doc2vec import Doc2Vec, TaggedDocument
+from gensim.models.word2vec import Word2Vec
+from sklearn.feature_extraction.text import TfidfVectorizer
+#CLASSIFIERS
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
+from sklearn.naive_bayes import GaussianNB, BernoulliNB
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.svm import LinearSVC ,SVC
+from sklearn.neural_network import MLPClassifier 
+from sklearn.linear_model import SGDClassifier
+from sklearn.neighbors import KNeighborsClassifier 
+
+#EVALUATION METRICS
 from sklearn.metrics import classification_report
-
-#return Json file
-def Read_json(path):
-    ''' Read and return JSON file context from provided Path to the Json file!'''
-    with codecs.open( path , 'r' , encoding="utf-8") as f:
-        return json.load(f)
-
-#return text file
-def Read_text(path):
-    ''' Read and return Text file context from provided Path to the Text file!'''
-    with codecs.open( path , 'r' , encoding='utf-8') as f:
-        return f.read()
-
-#calculating Evaluation Metrics
-def Precision(TP , TN , FP , FN):
-    return TP /(TP + FP)
-
-def Recall(TP , TN , FP , FN):
-    return TP / (TP + FN)
-
-def F1(recall, precision):
-    if recall == 0 and precision == 0:
-        return 0
-    return 2 * (recall * precision) / (recall + precision)
-
-def Accuracy(TP , TN , FP , FN):
-    return (TP + TN) / (TP + FP + FN + TN)
-
-#calculate confusion matrix based on normalized problem truth and predictions 
-# and returns  TP, FP, FN, TN
-def Confusion_matrix(truth_problem, prediction):
-    TP, TN, FP, FN = 0, 0, 0, 0
-    for problem_id, problem_value in truth_problem.items():
-        for truth_id, truth_value in problem_value.items():
-            for i in range(10):
-                if i == prediction[problem_id][truth_id] and prediction[problem_id][truth_id] == problem_value[truth_id]:
-                    TP += 1
-                elif i == prediction[problem_id][truth_id] and prediction[problem_id][truth_id] != problem_value[truth_id]:
-                    FP += 1
-                elif i != prediction[problem_id][truth_id] and i == problem_value[truth_id]:
-                    FN += 1
-                elif i != prediction[problem_id][truth_id] and i != problem_value[truth_id]:
-                    TN += 1
-    return TP, FP, FN, TN
-
-#Normalizing the truths of the problem
-def Normal_context(all_truth_context, **args):
-    truth_problem = {}
-    if args['whole_documents'] == 'on':
-         for key, values in all_truth_context.items():
-                truth_problem[key] = values['truth']
-
-    elif args['whole_documents'] == 'off' and 'target_problem' not in args.keys():
-        raise TypeError('Expected the value of the target_problem assigned to some value')
-
-    elif args['whole_documents'] == 'off':  
-        truth_problem[args['target_problem']] = all_truth_context[args['target_problem']]['truth']
-    return truth_problem
-
-#return all_candidates_txts , all_unknowns_txts, all_truths
-def Read_problems(dataset_root_dir , merge_candidates = False):
-    all_unknowns_txts = {}
-    all_candidates_txts = {}
-    all_truths = {}
-    
-    #read dataset info
-    problems = Read_json(os.path.join( dataset_root_dir , "collection-info.json"))
-    
-    #walk trough each problem
-    for problem in problems:
-        print("Loading problem : " , problem['problem-name'])
-        
-        # read problem info
-        problem_info = Read_json(os.path.join( dataset_root_dir , problem['problem-name'], 'problem-info.json'))
-        
-        #read candidates txt of the problem
-        candidates = [candidate['author-name'] for candidate in problem_info['candidate-authors']]
-        candidates_txts = {}
-        for candidate in candidates:
-            txt = []
-            for txt_name in os.listdir(os.path.join( dataset_root_dir , problem['problem-name'] , candidate)):
-                txt_path = os.path.join(os.path.join( dataset_root_dir , problem['problem-name'] , candidate , txt_name))
-                txt.append(Read_text(txt_path))
-            if merge_candidates:
-                candidates_txts[candidate] = ' '.join(txt)
-            else:
-                candidates_txts[candidate] = txt
-        all_candidates_txts[problem['problem-name']] = candidates_txts
-        
-        #read unknowns txt of the problem
-        unknowns_root_dir = os.path.join( dataset_root_dir , problem['problem-name'] , "unknown")
-        unknowns_txts = {}
-        for unknown in os.listdir(unknowns_root_dir):
-            unknown_txt = Read_text(os.path.join(unknowns_root_dir , unknown))
-            unknowns_txts[unknown] = unknown_txt
-        all_unknowns_txts[problem['problem-name']] = unknowns_txts
-        
-        #read truth of the unknowns txt of the problem
-        truth , label = {} , {}
-        candidates = {'<UNK>':0}
-        for index in range(0 , len(problem_info['candidate-authors'])):
-            candidates[problem_info['candidate-authors'][index]['author-name']] = index + 1
-        ground_truth = Read_json(os.path.join(dataset_root_dir , problem['problem-name'], 'ground-truth.json'))
-        
-        for index in range(0,len(ground_truth['ground_truth'])):
-            label[index + 1]= candidates[ground_truth['ground_truth'][index]['true-author']]
-
-        truth["language"] = problem['language']
-        truth["candidates"] = len(candidates) - 1
-        truth["truth"] = label
-        truth["candidates_id"] = candidates
-        all_truths[problem['problem-name']] = truth
-        
-    return all_candidates_txts , all_unknowns_txts, all_truths
+from sklearn.metrics import f1_score
 
 #prediction for classifiers
 def Prediction(clf , test , labels , candidates):
@@ -170,26 +70,21 @@ def buildWordVector(imdb_w2v, text, size):
     return vec
 
 #Run tf idf with stop words or without stop words
-def main():
-    _F1 = 0 # to calculate overall f1
+def W2V( all_candidates_txts , all_unknowns_txts, all_truths , stopwords_list , clf ):
+    results = []
     _TP = 0 # to calculate overall TP
     _test_size = 0 # to calculate overall tested documents
     _F1_score = 0
-    dataset_root_dir = "cross_dataset" #path to the dataset root
-    stopwords_list = {'en': set(stopwords.words('english')) , 'fr':set(stopwords.words('french')),
-                      'sp': set(stopwords.words('spanish')) , 'it':set(stopwords.words('italian'))}
-    all_candidates_txts , all_unknowns_txts, all_truths = Read_problems(dataset_root_dir , merge_candidates = True)
-    print('----------------------------------------------')
-    for test_problem_name in all_candidates_txts.keys():
-        print("Working on Problem :::: " , test_problem_name ) # print problem name
-        print("                   :::: " , all_truths[test_problem_name]['language'] )
-        candidates = all_truths[test_problem_name]["candidates_id"]
-        print("                   :::: " , len(candidates) - 1 , " candidates")
+    for problem in all_candidates_txts.keys():
+        results.append("Working on Problem :::: " + problem ) 
+        results.append("                   :::: " + all_truths[problem]['language'] )
+        candidates = all_truths[problem]["candidates_id"]
+        results.append("                   :::: " + str(len(candidates) - 1) + " candidates")
 
         #prepare Train Set
         train_set = []
         train_labels = []
-        for candidate , text in all_candidates_txts[test_problem_name].items():
+        for candidate , text in all_candidates_txts[problem].items():
             train_set.append(text)
             train_labels.append(candidate)
 
@@ -197,17 +92,17 @@ def main():
         test_set = []
         test_labels = []
         index = 0
-        for unknown , text in all_unknowns_txts[test_problem_name].items():
+        for unknown , text in all_unknowns_txts[problem].items():
             test_set.append(text)
-            test_labels.append(all_truths[test_problem_name]['truth'][index + 1])
+            test_labels.append(all_truths[problem]['truth'][index + 1])
             index += 1
     
-        print("                   :::: " , len(test_labels) , " test size")
+        results.append("                   :::: " + str(len(test_labels)) + " test size")
         #Training word2vec on test and train set for classification and prediction
         #Preprocessing train and test
-        train_set = [preprocessing(text , stopwords_list[all_truths[test_problem_name]['language']]) 
+        train_set = [preprocessing(text , stopwords_list[all_truths[problem]['language']]) 
                         for text in train_set]
-        test_set = [preprocessing(text , stopwords_list[all_truths[test_problem_name]['language']])
+        test_set = [preprocessing(text , stopwords_list[all_truths[problem]['language']])
                         for text in test_set]
         #Train word2vec model on train set
         n_dim = 300
@@ -227,7 +122,7 @@ def main():
         test = scale(test)
 
         #run clf on train set
-        clf = LinearSVC()
+
         clf.fit(train  , train_labels) 
 
         #make predictions on test set
@@ -236,30 +131,21 @@ def main():
         #Calculating F1-Macro 
         y_predict = [predict for _ , predict in predicts_dict.items()] 
         _f1_score = f1_score(test_labels , y_predict , average = 'macro')
-        print("                   ::::   F1 SCORE   " , _f1_score)
-        print('  Classification Report:\n',classification_report(test_labels ,y_predict),'\n')
-        #Evaluate
-        
-        predictions = {test_problem_name:{'language':all_truths[test_problem_name]['language'] 
-                        , 'truth':predicts_dict , 'candidates':len(candidates) - 1 }}
-        truth_problems = Normal_context(all_truths , whole_documents = "off" , target_problem = test_problem_name)
-        predictions_normalize = Normal_context(predictions , whole_documents = "off",  target_problem = test_problem_name)
-        TP , FP , FN , TN = Confusion_matrix(truth_problems, predictions_normalize)
-        accuracy = Accuracy(TP , TN , FP , FN)
-        recall = Recall(TP , TN , FP , FN)
-        precision = Precision(TP , TN , FP , FN)
-        f1 = F1(recall  , precision)
-        print("                   ::::  F1    " , f1)
-        print("                   ::::  TP    " , TP)
-        _F1 = _F1 + f1
-        _TP = _TP + TP
+        TP = sum([ 1 for i in range(0 , len(test_labels)) if y_predict[i] == test_labels[i]  ])
+        results.append("                   :::: F1    " + str(_f1_score))
+        results.append("                   :::: TP    " + str( TP))
+        results.append("  Classification Report:\n" + str(classification_report(test_labels ,y_predict)) + "\n")
+        results.append('--------------------------------------------------------------')
         _test_size = _test_size + len(test_labels)
-        print('----------------------------------------------')
         _F1_score = _F1_score + _f1_score
-    print("OVERALL RESULTS  ::: ")
-    print('F1 overall score ::: ' , _F1/20 )
-    print('TP overall score ::: ' , _TP )
-    print("F1-SCORE overall ::: " , _F1_score / 20)
-    print('TEST SIZE overall documents ::: ' , _test_size )
+        _TP = _TP + TP
+    
+    results.append("OVERALL RESULTS  ::: ")
+    results.append('TP overall score ::: ' + str(_TP ))
+    results.append("F1-SCORE overall ::: " + str(_F1_score / 20))
+    results.append('TEST SIZE overall documents ::: ' + str(_test_size ))
+    return results
 
-main()
+def Run(all_candidates_txts , all_unknowns_txts, all_truths , stopwords_list , clf):
+    return W2V(all_candidates_txts , all_unknowns_txts, all_truths , stopwords_list , clf)
+    
