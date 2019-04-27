@@ -1,15 +1,17 @@
 import nltk
 from nltk.tokenize import word_tokenize
 from nltk.tag import pos_tag
-
 import json
 import codecs
 import os
 import data_visualization as dv
-
+import re 
 class Pan:
     english_stopwords = set(nltk.corpus.stopwords.words('english'))
-        
+    verb_list = []
+    pie_list = {}
+    input_file = open("mytext.txt", "w")
+    indentedPos_list = []    
     #preperacessing
     def Sentence_tokenizer(self , text, **args):
         if len(args) < 1:
@@ -32,16 +34,46 @@ class Pan:
         self.contenet_tokens_without_stopwords = [token for token in tokens if token.lower() not in self.english_stopwords]
         return self.contenet_tokens_without_stopwords 
 
-    def Pos_tagger(self, tokens, **args):
+    def Pos_tagger(self, **args):
         if len(args) < 1:
             args["pos_tagger"] = "nltk"
         if args["pos_tagger"] == "nltk":
-            self.token_pos_tag = pos_tag(tokens)
+            self.token_pos_tag = pos_tag(self.words_tokenize)
         return self.token_pos_tag
-            
-    def Terms_counter(self, text, **args):
-        pass
+      
+    def Terms_counter(self, **args):
+        print(".......................................................................................................................................................")
+        for id, pos in args.items():
+            self.Pos_counter(pos, self.verb_list)
+            self.pie_list[pos] = len(self.verb_list)
+            print(self.verb_list)
+            #self.input_file.write(" ".join(self.verb_list))
+            for word in self.verb_list:
+                self.input_file.write(str(word) + "\n")
+            print(".......................................................................................................................................................")
 
+        self.Pie(self.pie_list)
+      
+    def Pos_counter(self, pos, pos_list, uniqeWords = False):
+        pos_list.clear()
+        for word in self.token_pos_tag:
+            if uniqeWords:
+                if word[1] == pos and word not in pos_list:
+                    pos_list.append(word)
+            else:
+                if word[1] == pos:
+                    pos_list.append(word)
+    
+    def Comperation_of_two_documents(self, document1, document2,**args):
+        words_tokenize = nltk.word_tokenize(document1)
+        word_tokenize2 = nltk.word_tokenize(document2)
+        self.token_pos_tag = nltk.pos_tag(words_tokenize)
+        self.Terms_counter(**args)
+        self.token_pos_tag = nltk.pos_tag(word_tokenize2)
+        self.Terms_counter(**args)
+
+    
+    
     #visualization
     def Pie(self, args ,**argss):
         """
@@ -50,10 +82,11 @@ class Pan:
                  'y' : [38.4, 40.6, 20.7, 10.3] , 
                  'colors' : ['yellowgreen', 'gold', 'lightskyblue', 'lightcoral']}
         """
-        if ('x' and 'y' and 'colors' not in args.keys()) and (type(args['x']) and type(args['y']) and type(args['colors']) is not list):
-            raise TypeError("Excpected 'x' , 'y' and 'colors' list arguments doesn't provided !")
-        else:
-            dv.pieplot(x = args['x'] , y = args['y'] , colors = args['colors'])
+        print(args)
+        x = [key for key , value in args.items()]
+        y = [value for key , value in args.items()]
+        colors = [ c for c in range(1 , len(args) + 1)] 
+        dv.pieplot(x = x , y = y , colors = colors )
         
     def Bar(self, args ,**argss):
         """
@@ -62,10 +95,11 @@ class Pan:
                  'y' = [1, 2, 3 , 4 , 5] 
                 }
         """
-        if ('x' and 'y' not in args.keys()) and type(args['x']) is not tuple and type(args['y']) is not list:
-            raise TypeError("Excpected 'x' (touple) and 'y' (list) arguments doesn't provided !")
-        else:
-            dv.bar(x = args['x'] , y = args['y'] )#,  xlabel = args['xlabel'] if 'xlabel' in args.keys() , 
+        x = ()
+        for key , value in args.items():
+            x += (key, ) 
+        y = [ value for key , value in args.items()]
+        dv.bar(x = x , y = y )#,  xlabel = args['xlabel'] if 'xlabel' in args.keys() , 
                    #ylabel=args['ylabel'] if 'ylabel' in args.keys() , title= args['title'] if 'title' in args.keys())
         
     def Scatter(self, args, **argss):
@@ -99,13 +133,14 @@ class Pan:
     #machine learning & natural language processing
     def Tf_idf(self):
         pass
-
     def Bag_of_words(self, **text):
         pass  
+
 
     #interpret NLP
     def Stop_words(self):
         return self.english_stopwords
+
 
     #performance
     def Precision(self):     
@@ -124,17 +159,21 @@ class Pan:
         self.accuracy = (self.TP + self.TN) / (self.TP + self.FP + self.FN + self.TN)
         return self.accuracy
 
-
     def C_at_1(self):
         pass
-    
+
 class Cross_Domain_Authorship_Attribution(Pan):
+    merge_candidates = False
+    all_candidates_txts = {}
+    dataset_root_dir = ""
+    #dataset path must be provided
 
     def Read_json_file(self, json_file_name):
         with codecs.open(json_file_name, 'r', encoding= 'utf-8') as json_read:
             self.json_context = json.load(json_read)
         return self.json_context
-
+    
+ 
     def Normal_context(self, **args):
         self.truth_problem = {}
         if args['whole_documents'] == 'on':
@@ -167,54 +206,36 @@ class Cross_Domain_Authorship_Attribution(Pan):
                 f.write('\n')
         f.close()
 
-    def Read_json(self , path):
-        ''' Read and return JSON file context from provided Path to the Json file!'''
-        with codecs.open( path , 'r' , encoding="utf-8") as f:
+
+    def Set_dataset_dir(self , path):
+        self.dataset_root_dir = path
+
+
+    def Read_collection_info(self):
+        with codecs.open(os.path.join(self.dataset_root_dir , "collection-info.json") , 'r' , encoding="utf-8") as f:
                 return json.load(f)
-
-    def Read_text(self , path):
-        ''' Read and return Text file context from provided Path to the Text file!'''
-        with codecs.open( path , 'r' , encoding='utf-8') as f:
-            return f.read()
-
-    def Read_problems(self , dataset_root_dir , merge_candidates = False):
-        """
-        Reading problems candidates texts from txt files.
-        Returning candidates text for each Problem in this Data Structors:
-        Here merge_candidates variabel is 'False'
-        all_candidates_txts = {
-            'problem00001': { 'candidate00001': [txt1 , txt2 , txt3 , txt4, ...],
-                             'candidate00002': [txt1 , txt2 , txt3 , txt4, ...],
-                             .....
-                             }
-            'problem00002': { 'candidate00001': [txt1 , txt2 , txt3 , txt4, ...],
-                             .....
-                             }
-            .....
-            ..... }
-        if merge_candidates variable is 'True'
-        all_candidates_txts = { 'problem00001': { 'candidate00001': txt , 'candidate00002': txt, ...} 
-                                'problem00002': { 'candidate00001': txt , .... } , .... }
-        """
-        all_candidates_txts = {}
-        problems = self.Read_json(os.path.join( dataset_root_dir , "collection-info.json"))
+    
+    def Read_problems(self):
+        problems = self.Read_collection_info()  
         for problem in problems:
             print("working on problem : " , problem['problem-name'])
-            problem_info = self.Read_json(os.path.join( dataset_root_dir , problem['problem-name'], 'problem-info.json'))
+            with codecs.open(os.path.join(self.dataset_root_dir , problem['problem-name'], 'problem-info.json') ,'r' , encoding='utf-8') as j:
+                problem_info = json.load(j)
             candidates = [candidate['author-name'] for candidate in problem_info['candidate-authors']]
             candidates_txts = {}
             for candidate in candidates:
                 txt = []
-                for txt_name in os.listdir(os.path.join( dataset_root_dir , problem['problem-name'] , candidate)):
-                    txt_path = os.path.join(os.path.join( dataset_root_dir , problem['problem-name'] , candidate , txt_name))
-                    txt.append(self.Read_text(txt_path))
-                if merge_candidates:
+                for txt_name in os.listdir(os.path.join(self.dataset_root_dir , problem['problem-name'] , candidate)):
+                    txt_path = os.path.join(os.path.join(self.dataset_root_dir , problem['problem-name'] , candidate , txt_name))
+                    with codecs.open(txt_path , 'r' , encoding='utf-8') as f:
+                        txt.append(f.read())
+                if self.merge_candidates:
                     candidates_txts[candidate] = ' '.join(txt)
                 else:
                     candidates_txts[candidate] = txt
-            all_candidates_txts[problem['problem-name']] = candidates_txts
-        return all_candidates_txts
-
+                    #yield candidates_txts
+            self.all_candidates_txts[problem['problem-name']] = candidates_txts
+    
 class Style_Change_Detection(Pan):
     pass
 
@@ -224,17 +245,12 @@ class Celebrity_Profiling(Pan):
 class Bots_And_Gender_Profiling(Pan):
     pass
 
+import os
 
 def main():
-    cross_domain_task = Cross_Domain_Authorship_Attribution()
-    prediction_dic = cross_domain_task.Read_json_file("alternative_truth_json.json")
-    prediction_normal = cross_domain_task.Normal_context(whole_documents = "on")
-    cross_domain_task.Read_json_file("all_truth.json")
-    cross_domain_task.Normal_context(whole_documents = "on")
-    cross_domain_task.Confusion_matrix(prediction_normal)
-    print('Accuracy is : ',cross_domain_task.Accuracy())
-    print('Precision is : ', cross_domain_task.Precision())
-    print('Recall is : ', cross_domain_task.Recall())
-    print('F1 score is : ', cross_domain_task.F1())
-
-#if __name__ == "__main__": main()
+    cr_d = Cross_Domain_Authorship_Attribution()
+    unknown = open("known00001.txt", "r")
+    known = open("unknown00001.txt", "r")
+    cr_d.Comperation_of_two_documents(unknown.read(), known.read(), pos1 = "CC", pos2 = "JJ", pos3 = "VB")
+    
+if __name__ == "__main__": main()
