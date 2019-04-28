@@ -27,21 +27,15 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.linear_model import SGDClassifier
 from sklearn.neighbors import KNeighborsClassifier 
 
+from sklearn import preprocessing
+from sklearn.multiclass import OneVsRestClassifier
+from sklearn.calibration import CalibratedClassifierCV
 #EVALUATION METRICS
 from sklearn.metrics import classification_report
 from sklearn.metrics import f1_score
 
-
-#prediction for classifiers
-def Prediction(clf , test_tfidf , labels , candidates):
-    prediction_dict = {}
-    for index in range(0 , len(labels)):
-        predict = clf.predict(test_tfidf[index])[0]
-        prediction_dict[index+1] = candidates[predict]
-    return prediction_dict
-
 #clean punchuations and stop words from txt
-def preprocessing(text , _stopwords):
+def Preprocessing(text , _stopwords):
     lemmatizer = WordNetLemmatizer()
     cleaned_text = []
     text = text.replace('-' , '')
@@ -57,14 +51,15 @@ def preprocessing(text , _stopwords):
     return ' '.join(cleaned_text)
 
 #Run tf idf with stop words or without stop words
-def TFIDF( all_candidates_txts , all_unknowns_txts, all_truths , stopwords_list, clf , 
-        tfidf_max_features = 200 , with_stop_words = False , clean_text = False ):
+def TFIDF( all_candidates_txts , all_unknowns_txts, all_truths , stopwords_list, _clf , merge_candidates,
+        tfidf_max_features = 200 , with_stop_words = False ):
     results = []
     _TP = 0 # to calculate overall TP
     _test_size = 0 # to calculate overall tested documents
     _F1_score = 0
     language = {'en': 'english', 'fr':'french', 'sp': 'spanish', 'it':'italian'}
     for problem in all_candidates_txts.keys():
+        print("Working on Problem:::" , problem)
         results.append("Working on Problem :::: " + problem ) # print problem name
         results.append("                   :::: " + all_truths[problem]['language'] )
         candidates = all_truths[problem]["candidates_id"]
@@ -73,22 +68,21 @@ def TFIDF( all_candidates_txts , all_unknowns_txts, all_truths , stopwords_list,
         #prepare Train Set
         train_set = []
         train_labels = []
-        for candidate , text in all_candidates_txts[problem].items():
-            if clean_text:
-                train_set.append(preprocessing(text , stopwords_list))
+        for candidate , candidate_texts in all_candidates_txts[problem].items():
+            if merge_candidates:
+                train_set.append(Preprocessing(text , stopwords_list))
+                train_labels.append(candidate)
             else:
-                train_set.append(text)
-            train_labels.append(candidate)
+                for text in candidate_texts:
+                    train_set.append(text)
+                    train_labels.append(candidate)
 
         #prepare Test Set
         test_set = []
         test_labels = []
         index = 0
         for unknown , text in all_unknowns_txts[problem].items():
-            if clean_text:
-                test_set.append(preprocessing(text , stopwords_list))
-            else:
-                test_set.append(text)
+            test_set.append(Preprocessing(text , stopwords_list))
             test_labels.append(all_truths[problem]['truth'][index + 1])
             index += 1
 
@@ -109,12 +103,23 @@ def TFIDF( all_candidates_txts , all_unknowns_txts, all_truths , stopwords_list,
         results.append("                   :::: Actual number of tfidf features on Test set: " + str(test_tfidf.get_shape()[1]))
 
         #run clf on train set
-        clf.fit(train_tfidf , train_labels)
-        #make predictions on test set
+        max_abs_scaler = preprocessing.MaxAbsScaler()
+        scaled_train_data = max_abs_scaler.fit_transform(train_tfidf)
+        scaled_test_data = max_abs_scaler.transform(test_tfidf)
+        clf = CalibratedClassifierCV(_clf)
+        clf.fit(scaled_train_data, train_labels)
+        predictions = clf.predict(scaled_test_data)
+        proba = clf.predict_proba(scaled_test_data)
+        # Reject option (used in open-set cases)
+        count=0
+        for i,p in enumerate(predictions):
+            sproba=sorted(proba[i],reverse=True)
+            if sproba[0] - sproba[1] < 0.1:
+                predictions[i]= '<UNK>'
+                count=count+1
 
-        predicts_dict = Prediction( clf , test_tfidf , test_labels , candidates)
-
-        y_predict = [predict for _ , predict in predicts_dict.items()] 
+        #Calculating F1-Macro 
+        y_predict = [candidates[predict] for predict in predictions]
         _f1_score = f1_score(test_labels , y_predict , average = 'macro')
         TP = sum([ 1 for i in range(0 , len(test_labels)) if y_predict[i] == test_labels[i]  ])
         results.append("                   :::: F1    " + str(_f1_score))
@@ -134,6 +139,6 @@ def TFIDF( all_candidates_txts , all_unknowns_txts, all_truths , stopwords_list,
     results.append('TEST SIZE overall documents ::: ' + str(_test_size ))
     return results
 
-def Run(all_candidates_txts , all_unknowns_txts, all_truths , stopwords_list , clf ):
-    return TFIDF(all_candidates_txts , all_unknowns_txts, all_truths , stopwords_list , clf)
+def Run(all_candidates_txts , all_unknowns_txts, all_truths , stopwords_list , _clf , merge_candidates ):
+    return TFIDF(all_candidates_txts , all_unknowns_txts, all_truths , stopwords_list , _clf , merge_candidates)
     

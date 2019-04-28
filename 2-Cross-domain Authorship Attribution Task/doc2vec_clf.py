@@ -27,20 +27,15 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.linear_model import SGDClassifier
 from sklearn.neighbors import KNeighborsClassifier 
 
+from sklearn import preprocessing
+from sklearn.multiclass import OneVsRestClassifier
+from sklearn.calibration import CalibratedClassifierCV
 #EVALUATION METRICS
 from sklearn.metrics import classification_report
 from sklearn.metrics import f1_score
 
-#prediction for classifiers
-def Prediction(clf , test , labels , candidates):
-    prediction_dict = {}
-    for index in range(0 , len(labels)):
-        predict = clf.predict([test[index]])[0]
-        prediction_dict[index+1] = candidates[predict]
-    return prediction_dict
-
 #clean punchuations and stop words from txt
-def preprocessing(text , _stopwords):
+def Preprocessing(text , _stopwords):
     lemmatizer = WordNetLemmatizer()
     cleaned_text = []
     text = text.replace('-' , '')
@@ -62,12 +57,13 @@ def vector_for_learning(model, input_docs):
     return targets, feature_vectors
 
 #Run tf idf with stop words or without stop words
-def D2V( all_candidates_txts , all_unknowns_txts, all_truths , stopwords_list , clf):
+def D2V( all_candidates_txts , all_unknowns_txts, all_truths , stopwords_list , _clf , merge_candidates):
     results = []
     _TP = 0 # to calculate overall TP
     _test_size = 0 # to calculate overall tested documents
     _F1_score = 0
     for problem in all_candidates_txts.keys():
+        print("Working on Problem:::" , problem)
         results.append("Working on Problem :::: " + problem ) 
         results.append("                   :::: " + all_truths[problem]['language'] )
         candidates = all_truths[problem]["candidates_id"]
@@ -76,17 +72,21 @@ def D2V( all_candidates_txts , all_unknowns_txts, all_truths , stopwords_list , 
         #prepare Train Set
         train_set = []
         train_labels = []
-        for candidate , text in all_candidates_txts[problem].items():
-            train_set.append(TaggedDocument(words=preprocessing(text, stopwords_list[all_truths[problem]['language']])
-                            , tags=[candidate]))
-            train_labels.append(candidate)
-
+        for candidate , candidate_texts in all_candidates_txts[problem].items():
+            if merge_candidates:
+                train_set.append(TaggedDocument(words=Preprocessing(candidate_texts, stopwords_list[all_truths[problem]['language']])
+                                , tags=[candidate]))
+                train_labels.append(candidate)
+            else:
+                for text in candidate_texts:
+                    train_set.append(text)
+                    train_labels.append(candidate)
         #prepare Test Set
         test_set = []
         test_labels = []
         index = 0
         for unknown , text in all_unknowns_txts[problem].items():
-            test_set.append(TaggedDocument(words=preprocessing(text , stopwords_list[all_truths[problem]['language']])
+            test_set.append(TaggedDocument(words=Preprocessing(text , stopwords_list[all_truths[problem]['language']])
                             , tags=[ candidate for candidate , key in candidates.items()
                                      if key == all_truths[problem]['truth'][index + 1]]))
             test_labels.append(all_truths[problem]['truth'][index + 1])
@@ -108,13 +108,23 @@ def D2V( all_candidates_txts , all_unknowns_txts, all_truths , stopwords_list , 
         y_test, x_test = vector_for_learning(doc2vec_model, test_set)
 
         #run clf on train set
-        clf.fit(x_train  , y_train) 
-
-        #make predictions on test set
-        predicts_dict =  Prediction( clf , x_test  , test_labels , candidates)
+        max_abs_scaler = preprocessing.MaxAbsScaler()
+        scaled_train_data = max_abs_scaler.fit_transform(x_train)
+        scaled_test_data = max_abs_scaler.transform(x_test)
+        clf = CalibratedClassifierCV(_clf)
+        clf.fit(scaled_train_data, train_labels)
+        predictions = clf.predict(scaled_test_data)
+        proba = clf.predict_proba(scaled_test_data)
+        # Reject option (used in open-set cases)
+        count=0
+        for i,p in enumerate(predictions):
+            sproba=sorted(proba[i],reverse=True)
+            if sproba[0] - sproba[1] < 0.1:
+                predictions[i]= '<UNK>'
+                count=count+1
 
         #Calculating F1-Macro 
-        y_predict = [predict for _ , predict in predicts_dict.items()]
+        y_predict = [candidates[predict] for predict in predictions]
         y_test = [candidates[label] for label in y_test]
         _f1_score = f1_score(y_test , y_predict , average = 'macro')
         TP = sum([ 1 for i in range(0 , len(y_test)) if y_predict[i] == y_test[i] ])
@@ -132,5 +142,5 @@ def D2V( all_candidates_txts , all_unknowns_txts, all_truths , stopwords_list , 
     results.append('TEST SIZE overall documents ::: ' + str( _test_size ))
     return results
 
-def Run( all_candidates_txts , all_unknowns_txts, all_truths , stopwords_list , clf):
-    return D2V( all_candidates_txts , all_unknowns_txts, all_truths , stopwords_list , clf)
+def Run( all_candidates_txts , all_unknowns_txts, all_truths , stopwords_list , _clf , merge_candidates):
+    return D2V( all_candidates_txts , all_unknowns_txts, all_truths , stopwords_list , _clf , merge_candidates)
