@@ -34,6 +34,7 @@ from sklearn.calibration import CalibratedClassifierCV
 from sklearn.metrics import classification_report
 from sklearn.metrics import f1_score
 
+
 #clean punchuations and stop words from txt
 def Preprocessing(text , _stopwords):
     lemmatizer = WordNetLemmatizer()
@@ -51,7 +52,7 @@ def Preprocessing(text , _stopwords):
     return ' '.join(cleaned_text)
 
 #Run tf idf with stop words or without stop words
-def TFIDF( all_candidates_txts , all_unknowns_txts, all_truths , stopwords_list, _clf , merge_candidates,
+def TFIDF( all_candidates_txts , all_unknowns_txts, all_truths , stopwords_list, _clf , merge_candidates, thereshold,
         tfidf_max_features = 200 , with_stop_words = False ):
     results = []
     _TP = 0 # to calculate overall TP
@@ -70,7 +71,7 @@ def TFIDF( all_candidates_txts , all_unknowns_txts, all_truths , stopwords_list,
         train_labels = []
         for candidate , candidate_texts in all_candidates_txts[problem].items():
             if merge_candidates:
-                train_set.append(Preprocessing(text , stopwords_list))
+                train_set.append(candidate_texts)
                 train_labels.append(candidate)
             else:
                 for text in candidate_texts:
@@ -82,9 +83,15 @@ def TFIDF( all_candidates_txts , all_unknowns_txts, all_truths , stopwords_list,
         test_labels = []
         index = 0
         for unknown , text in all_unknowns_txts[problem].items():
-            test_set.append(Preprocessing(text , stopwords_list))
+            test_set.append(text)
             test_labels.append(all_truths[problem]['truth'][index + 1])
             index += 1
+        
+        #preprocessing the train and test set
+        train_set = [Preprocessing(text , stopwords_list[all_truths[problem]['language']]) 
+                        for text in train_set]
+        test_set = [Preprocessing(text , stopwords_list[all_truths[problem]['language']])
+                        for text in test_set]
 
         results.append("                   :::: " + str(len(test_labels)) + " test size")
 
@@ -114,7 +121,7 @@ def TFIDF( all_candidates_txts , all_unknowns_txts, all_truths , stopwords_list,
         count=0
         for i,p in enumerate(predictions):
             sproba=sorted(proba[i],reverse=True)
-            if sproba[0] - sproba[1] < 0.1:
+            if sproba[0] - sproba[1] < thereshold :
                 predictions[i]= '<UNK>'
                 count=count+1
 
@@ -139,6 +146,6 @@ def TFIDF( all_candidates_txts , all_unknowns_txts, all_truths , stopwords_list,
     results.append('TEST SIZE overall documents ::: ' + str(_test_size ))
     return results
 
-def Run(all_candidates_txts , all_unknowns_txts, all_truths , stopwords_list , _clf , merge_candidates ):
-    return TFIDF(all_candidates_txts , all_unknowns_txts, all_truths , stopwords_list , _clf , merge_candidates)
+def Run(all_candidates_txts , all_unknowns_txts, all_truths , stopwords_list , _clf , merge_candidates , thereshold ):
+    return TFIDF(all_candidates_txts , all_unknowns_txts, all_truths , stopwords_list , _clf , merge_candidates, thereshold)
     

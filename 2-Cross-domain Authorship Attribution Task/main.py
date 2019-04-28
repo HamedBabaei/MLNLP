@@ -107,7 +107,7 @@ def Read_problems(dataset_root_dir , merge_candidates):
         
     return all_candidates_txts , all_unknowns_txts, all_truths
 
-def main(input , output , merge_candidates ):
+def main(input , output , merge_candidates, thereshold = 0.1 ):
     stopwords_list = {'en': set(stopwords.words('english')) , 'fr':set(stopwords.words('french')),
                       'sp': set(stopwords.words('spanish')) , 'it':set(stopwords.words('italian'))}
     all_candidates_txts , all_unknowns_txts, all_truths = Read_problems(dataset_root_dir = input , merge_candidates = merge_candidates)
@@ -124,23 +124,23 @@ def main(input , output , merge_candidates ):
                     }
     item = 0
     for classifier_name , classifier in classifiers.items():
-
+        
         item += 1
         print("working on " , str(item) + '- ' + classifier_name + ' + ' + 'Word2Vec')
-        results = w2v.Run(all_candidates_txts , all_unknowns_txts, all_truths , stopwords_list , classifier,  merge_candidates)
+        results = w2v.Run(all_candidates_txts , all_unknowns_txts, all_truths , stopwords_list , classifier,  merge_candidates ,thereshold )
         path = os.path.join(output , str(item) + '- ' + classifier_name + ' + ' + 'Word2Vec.txt')
         Write_text(path , '\n'.join(results) )
         
         item += 1
         print("working on " , str(item) + '- ' + classifier_name + ' + ' + 'Doc2Vec')
-        results = d2v.Run(all_candidates_txts , all_unknowns_txts, all_truths , stopwords_list , classifier , merge_candidates)
+        results = d2v.Run(all_candidates_txts , all_unknowns_txts, all_truths , stopwords_list , classifier , merge_candidates, thereshold)
         path = os.path.join(output , str(item) + '- ' + classifier_name + ' + ' + 'Doc2Vec.txt')
         Write_text(path , '\n'.join(results) ) 
-        
+            
         item += 1
         print("working on " , str(item) + '- ' + classifier_name + ' + ' + 'TF-IDF')
-        results = w2v.Run(all_candidates_txts , all_unknowns_txts, all_truths , stopwords_list , classifier, merge_candidates)       
+        results = w2v.Run(all_candidates_txts , all_unknowns_txts, all_truths , stopwords_list , classifier, merge_candidates , thereshold )       
         path = os.path.join(output , str(item) + '- ' + classifier_name + ' + ' + 'TFIDF.txt')
         Write_text(path , '\n'.join(results) ) 
 
-main( input = "cross_dataset" , output = "out" , merge_candidates = False)
+main( input = "cross_dataset" , output = "out" , merge_candidates = False , thereshold = 0.1)

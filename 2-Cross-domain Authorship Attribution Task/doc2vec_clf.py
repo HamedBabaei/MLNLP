@@ -57,7 +57,7 @@ def vector_for_learning(model, input_docs):
     return targets, feature_vectors
 
 #Run tf idf with stop words or without stop words
-def D2V( all_candidates_txts , all_unknowns_txts, all_truths , stopwords_list , _clf , merge_candidates):
+def D2V( all_candidates_txts , all_unknowns_txts, all_truths , stopwords_list , _clf , merge_candidates, thereshold):
     results = []
     _TP = 0 # to calculate overall TP
     _test_size = 0 # to calculate overall tested documents
@@ -79,7 +79,8 @@ def D2V( all_candidates_txts , all_unknowns_txts, all_truths , stopwords_list , 
                 train_labels.append(candidate)
             else:
                 for text in candidate_texts:
-                    train_set.append(text)
+                    train_set.append(TaggedDocument(words=Preprocessing(text, stopwords_list[all_truths[problem]['language']])
+                                , tags=[candidate]))
                     train_labels.append(candidate)
         #prepare Test Set
         test_set = []
@@ -119,7 +120,7 @@ def D2V( all_candidates_txts , all_unknowns_txts, all_truths , stopwords_list , 
         count=0
         for i,p in enumerate(predictions):
             sproba=sorted(proba[i],reverse=True)
-            if sproba[0] - sproba[1] < 0.1:
+            if sproba[0] - sproba[1] < thereshold:
                 predictions[i]= '<UNK>'
                 count=count+1
 
@@ -142,5 +143,5 @@ def D2V( all_candidates_txts , all_unknowns_txts, all_truths , stopwords_list , 
     results.append('TEST SIZE overall documents ::: ' + str( _test_size ))
     return results
 
-def Run( all_candidates_txts , all_unknowns_txts, all_truths , stopwords_list , _clf , merge_candidates):
-    return D2V( all_candidates_txts , all_unknowns_txts, all_truths , stopwords_list , _clf , merge_candidates)
+def Run( all_candidates_txts , all_unknowns_txts, all_truths , stopwords_list , _clf , merge_candidates, thereshold):
+    return D2V( all_candidates_txts , all_unknowns_txts, all_truths , stopwords_list , _clf , merge_candidates, thereshold)
